@@ -3,7 +3,7 @@ package throttling.service
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import scala.concurrent.duration._
 import akka.NotUsed
-import akka.stream.{ActorMaterializer, OverflowStrategy, ThrottleMode}
+import akka.stream.{OverflowStrategy, ThrottleMode}
 import akka.stream.scaladsl.{Sink, Source}
 
 
@@ -12,12 +12,10 @@ case class ThrottleRequest(userRequest: UserRequest)
 case class ThrottleResponse(sla: Option[Sla])
 case class Throttle(responder: ActorRef, userSla: Option[Sla])
 
-object ThrottlingService {
+object ThrottlingService extends ActorSystemHelper {
   def props(graceRps: Int): Props = Props(new ThrottlingService(graceRps))
 
   def createThrottler(actorToThrottle: ActorRef, duration: Int, rps: Int): ActorRef = {
-    implicit val system = ActorSystem("simple-rest-system")
-    implicit val materializer = ActorMaterializer()
     Source.actorRef(bufferSize = 1000, OverflowStrategy.dropNew)
       .throttle(rps, duration.second, 0, ThrottleMode.Shaping)
       .to(Sink.actorRef(actorToThrottle, NotUsed))
@@ -41,7 +39,7 @@ class ThrottlingService(val graceRps: Int) extends Actor with ActorLogging {
 
   throttlingCache.put(unauthorizedToken, unauthorizedThrottler)
 
-  val slaService: SlaServiceImpl = new SlaServiceImpl()
+  val slaService: SlaServiceImpl = new SlaServiceImpl(unauthorizedSla)
 
   def receive: Receive = {
 
@@ -61,7 +59,6 @@ class ThrottlingService(val graceRps: Int) extends Actor with ActorLogging {
               result.get.user,
               ThrottlingService.createThrottler(system.actorOf(Throttler.props()), 1, result.get.rps)
             )
-            throttlingCache.foreach(println)
           })
           unauthorizedSla
         })

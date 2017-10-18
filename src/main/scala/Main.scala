@@ -20,17 +20,19 @@ trait HealthJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val healthFormat = jsonFormat2(UserRequest)
 }
 
-object HttpServer extends HealthJsonSupport {
+trait ActorSystemHelper {
+  implicit val system = ActorSystem("simple-rest-system")
+  implicit val materializer = ActorMaterializer()
+  implicit val executionContext = system.dispatcher
+}
+
+object HttpServer extends HealthJsonSupport with ActorSystemHelper {
 
   private val config = ConfigFactory.load()
   private val host = config.getString("http.host")
   private val port = config.getInt("http.port")
 
   def main(args: Array[String]): Unit = {
-
-    implicit val system = ActorSystem("simple-rest-system")
-    implicit val materializer = ActorMaterializer()
-    implicit val executionContext = system.dispatcher
 
     val requestHandler = system.actorOf(ThrottlingService.props(config.getInt("throttling.grace_rps")),"requestHandler")
 
@@ -63,19 +65,6 @@ object HttpServer extends HealthJsonSupport {
     //Startup, and listen for requests
     val bindingFuture = Http().bindAndHandle(route, host, port)
     println(s"Waiting for requests at http://$host:$port/...\nHit RETURN to terminate")
-
-    for (x <- 1 to 100) {
-      Http().singleRequest(HttpRequest(
-        uri = Uri("http://localhost:8091/throttle"),
-        method = HttpMethods.POST,
-        entity = HttpEntity(
-          ContentTypes.`application/json`,
-          "{\"token\":\"token5\", \"description\":\"sfefse\"}"
-        ),
-        protocol = HttpProtocols.`HTTP/1.1`)
-      ).onComplete(println)
-      Thread.sleep(500)
-    }
 
     StdIn.readLine()
 
