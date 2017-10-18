@@ -1,14 +1,7 @@
 package throttling.service
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.stream.ActorMaterializer
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import akka.actor.{Actor, ActorRef, Props}
 import org.scalatest._
-
-import scala.concurrent.duration._
-import akka.util.Timeout
 
 class ThrottlerTest extends FlatSpec with Matchers with BeforeAndAfter with ActorSystemHelper {
 
